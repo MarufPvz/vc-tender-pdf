@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Tender, Requirement, UploadedDocument, Assignment } from '../lib/types';
+import { Tender, Requirement, UploadedDocument, Assignment, AutoMatchProposal } from '../lib/types';
 import { useTranslation } from '../lib/i18n';
 import { AppHeader } from './AppHeader';
 import { TenderHeader } from './TenderHeader';
@@ -12,13 +12,14 @@ import { DocumentSelectorModal } from './DocumentSelectorModal';
 import { PdfPreviewModal } from './PdfPreviewModal';
 import { GenerationModal } from './GenerationModal';
 import { ConfirmReplaceModal } from './ConfirmReplaceModal';
+import { AutoMatchReviewModal } from './AutoMatchReviewModal';
 import { ToastAlert, ToastMessage } from './ToastAlert';
 import { InitialScreen } from './InitialScreen';
 
 import { processPdfFile, validateUploadLimits } from '../lib/services/pdfReaderService';
 import { updateDuplicateFlags } from '../lib/services/duplicateService';
 import { calculateValidationSummary, calculateRequirementStatus, validateBeforeGeneration } from '../lib/services/validationService';
-import { analyzeAllCandidates } from '../lib/services/matchingService';
+import { analyzeAllCandidates, generateAutoMatchProposals } from '../lib/services/matchingService';
 import { generateTenderPackage, GeneratePackageResult } from '../lib/services/packageGenerator';
 import { downloadFile } from '../lib/services/downloadService';
 import { exportChecklistCsv } from '../lib/services/exportCsvService';
@@ -41,6 +42,8 @@ export function Workspace() {
   const [selectorRequirement, setSelectorRequirement] = useState<Requirement | null>(null);
   const [previewFile, setPreviewFile] = useState<UploadedDocument | null>(null);
   const [isGenerationModalOpen, setIsGenerationModalOpen] = useState(false);
+  const [isAutoMatchReviewOpen, setIsAutoMatchReviewOpen] = useState(false);
+  const [autoMatchProposals, setAutoMatchProposals] = useState<AutoMatchProposal[]>([]);
 
   // Replacement Confirmation State
   const [replaceTarget, setReplaceTarget] = useState<{
@@ -54,9 +57,6 @@ export function Workspace() {
   const [generationStep, setGenerationStep] = useState<'cover' | 'merging' | 'footers' | 'finalizing'>('cover');
   const [generationProgressPct, setGenerationProgressPct] = useState(0);
   const [generationResult, setGenerationResult] = useState<GeneratePackageResult | null>(null);
-
-  // Auto-match Banner Dismiss State
-  const [dismissedAutoMatch, setDismissedAutoMatch] = useState(false);
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -156,7 +156,6 @@ export function Workspace() {
       return updateDuplicateFlags(merged);
     });
 
-    setDismissedAutoMatch(false);
     setIsProcessingFiles(false);
     setProcessingProgress(undefined);
   };
@@ -258,29 +257,78 @@ export function Workspace() {
     });
   };
 
-  // Handler: Apply All Unambiguous High Matches
-  const handleApplyAllStrongMatches = () => {
+  // TWO-STEP AUTO-MATCH WORKFLOW
+  // 1. Open Review Panel with generated proposals
+  const handleOpenAutoMatchReview = () => {
+    const proposals = generateAutoMatchProposals(requirements, files, assignments);
+    setAutoMatchProposals(proposals);
+    setIsAutoMatchReviewOpen(true);
+  };
+
+  // 2. Toggle individual proposal selection
+  const handleToggleProposal = (proposalId: string) => {
+    setAutoMatchProposals(prev =>
+      prev.map(p => {
+        if (p.id !== proposalId) return p;
+        // If ambiguous and no file has been chosen yet, do not allow checking
+        if (p.confidence === 'ambiguous' && !p.fileId) return p;
+        return { ...p, selected: !p.selected };
+      })
+    );
+  };
+
+  // 3. User chooses which candidate to use in an ambiguous match
+  const handleSelectAmbiguousOption = (proposalId: string, fileId: string) => {
+    setAutoMatchProposals(prev =>
+      prev.map(p => {
+        if (p.id !== proposalId) return p;
+        return {
+          ...p,
+          fileId,
+          selected: true, // Automatically select once user makes their choice
+        };
+      })
+    );
+  };
+
+  // 4. Select all valid proposals
+  const handleSelectAllProposals = () => {
+    setAutoMatchProposals(prev =>
+      prev.map(p => {
+        // Can only select if fileId is defined
+        if (p.fileId) {
+          return { ...p, selected: true };
+        }
+        return p;
+      })
+    );
+  };
+
+  // 5. Clear all proposal selections
+  const handleClearAllProposals = () => {
+    setAutoMatchProposals(prev => prev.map(p => ({ ...p, selected: false })));
+  };
+
+  // 6. Apply selected matches (confirmed assignments)
+  const handleApplyAutoMatches = () => {
+    const selectedProposals = autoMatchProposals.filter(p => p.selected && p.fileId);
+
     setAssignments(prev => {
       const updated = { ...prev };
-      let appliedCount = 0;
-
-      for (const [reqId, cands] of Object.entries(candidateMatches)) {
-        if (cands.length > 0 && cands[0].level === 'HIGH' && !updated[reqId]?.fileId) {
-          updated[reqId] = {
-            requirementId: reqId,
-            fileId: cands[0].fileId,
-            expiryDate: updated[reqId]?.expiryDate || null,
+      for (const proposal of selectedProposals) {
+        if (proposal.fileId) {
+          updated[proposal.requirementId] = {
+            requirementId: proposal.requirementId,
+            fileId: proposal.fileId,
+            expiryDate: updated[proposal.requirementId]?.expiryDate || null,
           };
-          appliedCount++;
         }
-      }
-
-      if (appliedCount > 0) {
-        addToast('success', t('requirements.applyAutoMatch'));
       }
       return updated;
     });
-    setDismissedAutoMatch(true);
+
+    setIsAutoMatchReviewOpen(false);
+    addToast('success', t('autoMatch.successApplied', { count: selectedProposals.length }));
   };
 
   // Handler: Generate Final Package
@@ -397,9 +445,7 @@ export function Workspace() {
                   files={files}
                   candidateMatches={candidateMatches}
                   submissionDeadline={tender.submission_deadline}
-                  hasUnconfirmedHighMatches={!dismissedAutoMatch}
-                  onApplyAllStrongMatches={handleApplyAllStrongMatches}
-                  onDismissAutoMatch={() => setDismissedAutoMatch(true)}
+                  onOpenAutoMatchReview={handleOpenAutoMatchReview}
                   onOpenSelector={(req) => setSelectorRequirement(req)}
                   onRemoveAssignment={handleRemoveAssignment}
                   onUpdateExpiryDate={handleUpdateExpiryDate}
@@ -437,6 +483,21 @@ export function Workspace() {
           </div>
         )}
       </main>
+
+      {/* Auto-Match Review Modal (Two-Step Workflow) */}
+      <AutoMatchReviewModal
+        isOpen={isAutoMatchReviewOpen}
+        proposals={autoMatchProposals}
+        requirements={requirements}
+        files={files}
+        onToggleProposal={handleToggleProposal}
+        onSelectAmbiguousOption={handleSelectAmbiguousOption}
+        onSelectAll={handleSelectAllProposals}
+        onClearAll={handleClearAllProposals}
+        onApply={handleApplyAutoMatches}
+        onPreview={(file) => setPreviewFile(file)}
+        onClose={() => setIsAutoMatchReviewOpen(false)}
+      />
 
       {/* Document Selector Modal */}
       <DocumentSelectorModal

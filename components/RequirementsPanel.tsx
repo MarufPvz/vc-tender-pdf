@@ -4,7 +4,7 @@ import React from 'react';
 import { Requirement, Assignment, UploadedDocument, DocumentStatus, CandidateMatch } from '../lib/types';
 import { RequirementRow } from './RequirementRow';
 import { useTranslation } from '../lib/i18n';
-import { Sparkles, CheckCheck, X } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 interface RequirementsPanelProps {
   requirements: Requirement[];
@@ -12,9 +12,7 @@ interface RequirementsPanelProps {
   files: UploadedDocument[];
   candidateMatches: Record<string, CandidateMatch[]>;
   submissionDeadline: string;
-  hasUnconfirmedHighMatches: boolean;
-  onApplyAllStrongMatches: () => void;
-  onDismissAutoMatch: () => void;
+  onOpenAutoMatchReview: () => void;
   onOpenSelector: (req: Requirement) => void;
   onRemoveAssignment: (reqId: string) => void;
   onUpdateExpiryDate: (reqId: string, date: string) => void;
@@ -29,9 +27,7 @@ export function RequirementsPanel({
   files,
   candidateMatches,
   submissionDeadline,
-  hasUnconfirmedHighMatches,
-  onApplyAllStrongMatches,
-  onDismissAutoMatch,
+  onOpenAutoMatchReview,
   onOpenSelector,
   onRemoveAssignment,
   onUpdateExpiryDate,
@@ -40,17 +36,16 @@ export function RequirementsPanel({
   getStatus,
 }: RequirementsPanelProps) {
   const { t } = useTranslation();
-  const fileMap = new Map<string, UploadedDocument>(files.map(f => [f.id, f]));
+  const fileMap = new Map(files.map(f => [f.id, f]));
 
-  // Count strong unassigned matches
-  const strongMatchCount = Object.values(candidateMatches).filter(
-    list => list.length > 0 && list[0].level === 'HIGH'
-  ).length;
+  // Check how many unassigned requirements exist
+  const unassignedCount = requirements.filter(r => !assignments[r.id]?.fileId).length;
+  const hasAvailableFiles = files.some(f => f.readable && !f.duplicate);
 
   return (
     <div className="space-y-4">
-      {/* Panel Header */}
-      <div className="flex items-center justify-between pb-1">
+      {/* Panel Header with Prominent Auto-Match CTA */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
         <div className="flex items-center gap-2">
           <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
             {t('requirements.title')}
@@ -59,37 +54,19 @@ export function RequirementsPanel({
             {t('requirements.countBadge', { count: requirements.length })}
           </span>
         </div>
-      </div>
 
-      {/* Auto-match banner for unambiguous high confidence suggestions */}
-      {hasUnconfirmedHighMatches && strongMatchCount > 0 && (
-        <div className="flex items-center justify-between gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 animate-fadeIn">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
-            <span>
-              {t('requirements.autoMatchNotice', { count: strongMatchCount })}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={onApplyAllStrongMatches}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-2xs transition-colors"
-            >
-              <CheckCheck className="w-3.5 h-3.5" />
-              {t('requirements.applyAutoMatch')}
-            </button>
-            <button
-              type="button"
-              onClick={onDismissAutoMatch}
-              className="p-1 rounded-md text-indigo-500 hover:bg-indigo-100 transition-colors"
-              title={t('requirements.dismissAutoMatch')}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
+        {/* Prominent Auto-Match Action Button */}
+        {unassignedCount > 0 && hasAvailableFiles && (
+          <button
+            type="button"
+            onClick={onOpenAutoMatchReview}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 active:scale-[0.98] transition-all cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4 text-indigo-200" />
+            <span>{t('autoMatch.buttonLabel')}</span>
+          </button>
+        )}
+      </div>
 
       {/* Requirements List */}
       <div className="space-y-3">

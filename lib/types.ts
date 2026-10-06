@@ -63,6 +63,24 @@ export interface CandidateMatch {
   detectedYear?: string;
 }
 
+export interface AutoMatchCandidateOption {
+  fileId: string;
+  score: number;
+  reasons: string[];
+}
+
+export interface AutoMatchProposal {
+  id: string;
+  requirementId: string;
+  fileId: string | null;
+  score: number;
+  confidence: 'high' | 'medium' | 'low' | 'ambiguous';
+  reasons: string[];
+  selected: boolean;
+  ambiguousOptions?: AutoMatchCandidateOption[];
+  conflict?: boolean;
+}
+
 export interface ValidationSummary {
   total: number;
   okCount: number;
