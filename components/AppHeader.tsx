@@ -22,25 +22,25 @@ export function AppHeader({
   const { language, setLanguage, t } = useTranslation();
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-4 sm:px-6 py-3">
+    <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-slate-200/90 px-4 sm:px-6 py-3.5">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         {/* Brand / Title */}
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
             <FileText className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+              <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
                 {t('app.name')}
               </h1>
               {tenderId && (
-                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-md text-xs sm:text-sm font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
                   {tenderId}
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 hidden md:block">
+            <p className="text-xs sm:text-sm text-slate-500 font-medium hidden md:block">
               {t('app.tagline')}
             </p>
           </div>
@@ -55,9 +55,9 @@ export function AppHeader({
                   type="button"
                   onClick={onSaveProject}
                   title={t('header.saveProject')}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition-colors"
                 >
-                  <Save className="w-3.5 h-3.5" />
+                  <Save className="w-4 h-4 text-slate-600" />
                   <span className="hidden sm:inline">{t('header.saveProject')}</span>
                 </button>
               )}
@@ -67,9 +67,9 @@ export function AppHeader({
                   type="button"
                   onClick={onLoadProject}
                   title={t('header.loadProject')}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition-colors"
                 >
-                  <FolderOpen className="w-3.5 h-3.5" />
+                  <FolderOpen className="w-4 h-4 text-slate-600" />
                   <span className="hidden sm:inline">{t('header.loadProject')}</span>
                 </button>
               )}
@@ -79,9 +79,9 @@ export function AppHeader({
                   type="button"
                   onClick={onResetTender}
                   title={t('header.resetTender')}
-                  className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
+                  <RotateCcw className="w-4 h-4" />
                   <span className="hidden md:inline">{t('header.resetTender')}</span>
                 </button>
               )}
@@ -89,13 +89,13 @@ export function AppHeader({
           )}
 
           {/* Bilingual Segmented Control */}
-          <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-medium">
+          <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs sm:text-sm font-bold">
             <button
               type="button"
               onClick={() => setLanguage('en')}
-              className={`px-2.5 py-1 rounded-md transition-all ${
+              className={`px-3 py-1.5 rounded-lg transition-all ${
                 language === 'en'
-                  ? 'bg-white text-indigo-700 shadow-xs font-semibold'
+                  ? 'bg-white text-indigo-700 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -104,9 +104,9 @@ export function AppHeader({
             <button
               type="button"
               onClick={() => setLanguage('bn')}
-              className={`px-2.5 py-1 rounded-md transition-all ${
+              className={`px-3 py-1.5 rounded-lg transition-all ${
                 language === 'bn'
-                  ? 'bg-white text-indigo-700 shadow-xs font-semibold'
+                  ? 'bg-white text-indigo-700 shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >

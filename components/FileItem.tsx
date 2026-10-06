@@ -62,46 +62,46 @@ export function FileItem({
         </div>
 
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-900 truncate" title={file.name}>
+          <p className="text-sm sm:text-base font-bold text-slate-900 truncate" title={file.name}>
             {file.name}
           </p>
 
-          <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center gap-2 mt-1 text-xs sm:text-sm text-slate-600">
             {file.readable ? (
               <>
-                <span>{t('requirements.pagesCount', { pages: file.pageCount })}</span>
+                <span className="font-medium">{t('requirements.pagesCount', { pages: file.pageCount })}</span>
                 <span>·</span>
-                <span>{formatFileSize(file.size)}</span>
+                <span className="font-medium">{formatFileSize(file.size)}</span>
                 {file.detectedYears.length > 0 && (
                   <>
                     <span>·</span>
-                    <span className="font-mono text-slate-600 font-semibold bg-slate-100 px-1 py-0.2 rounded text-2xs">
+                    <span className="font-mono text-slate-800 font-bold bg-slate-100 px-1.5 py-0.5 rounded text-xs">
                       {file.detectedYears.join(', ')}
                     </span>
                   </>
                 )}
               </>
             ) : (
-              <span className="text-rose-600 font-medium">
+              <span className="text-rose-700 font-semibold">
                 {file.errorReason || t('documents.unreadableTag')}
               </span>
             )}
           </div>
 
           {/* Status & Analysis Badges */}
-          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
             {file.duplicate ? (
-              <span className="inline-flex items-center gap-1 text-2xs font-semibold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                 {file.duplicateOf
                   ? t('documents.duplicateOfTag', { filename: file.duplicateOf })
                   : t('documents.duplicateTag')}
               </span>
             ) : matchedRequirementTitle ? (
-              <span className="inline-flex items-center gap-1 text-2xs font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
                 {t('documents.matchedTag', { req: matchedRequirementTitle })}
               </span>
             ) : file.readable ? (
-              <span className="inline-flex items-center text-2xs font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+              <span className="inline-flex items-center text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
                 {t('documents.readyTag')}
               </span>
             ) : null}
@@ -110,13 +110,13 @@ export function FileItem({
               file.isScanned ? (
                 <span
                   title={t('documents.scannedNotice')}
-                  className="inline-flex items-center gap-0.5 text-2xs font-medium text-amber-800 bg-amber-50/70 border border-amber-200/60 px-1.5 py-0.5 rounded"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md"
                 >
-                  <FileScan className="w-3 h-3 text-amber-600" />
+                  <FileScan className="w-3.5 h-3.5 text-amber-600" />
                   {t('documents.scannedTag')}
                 </span>
               ) : (
-                <span className="inline-flex items-center text-2xs font-medium text-sky-800 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200/60">
+                <span className="inline-flex items-center text-xs font-semibold text-sky-900 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200">
                   {t('documents.textPdfTag')}
                 </span>
               )
@@ -132,9 +132,9 @@ export function FileItem({
             type="button"
             onClick={() => onPreview(file)}
             title={t('documents.previewBtn')}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           >
-            <Eye className="w-4 h-4" />
+            <Eye className="w-4.5 h-4.5" />
           </button>
         )}
 
@@ -142,9 +142,9 @@ export function FileItem({
           type="button"
           onClick={() => onRemove(file.id)}
           title={t('documents.removeFileBtn')}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+          className="p-2 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
         >
-          <Trash2 className="w-4 h-4" />
+          <Trash2 className="w-4.5 h-4.5" />
         </button>
       </div>
     </div>
