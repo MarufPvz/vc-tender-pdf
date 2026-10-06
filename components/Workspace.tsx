@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Tender, Requirement, UploadedDocument, Assignment } from '../lib/types';
 import { useTranslation } from '../lib/i18n';
 import { AppHeader } from './AppHeader';
@@ -11,13 +11,14 @@ import { PackageStatusPanel } from './PackageStatusPanel';
 import { DocumentSelectorModal } from './DocumentSelectorModal';
 import { PdfPreviewModal } from './PdfPreviewModal';
 import { GenerationModal } from './GenerationModal';
+import { ConfirmReplaceModal } from './ConfirmReplaceModal';
 import { ToastAlert, ToastMessage } from './ToastAlert';
 import { InitialScreen } from './InitialScreen';
 
 import { processPdfFile, validateUploadLimits } from '../lib/services/pdfReaderService';
 import { updateDuplicateFlags } from '../lib/services/duplicateService';
 import { calculateValidationSummary, calculateRequirementStatus, validateBeforeGeneration } from '../lib/services/validationService';
-import { getAutoMatchSuggestions } from '../lib/services/matchingService';
+import { analyzeAllCandidates } from '../lib/services/matchingService';
 import { generateTenderPackage, GeneratePackageResult } from '../lib/services/packageGenerator';
 import { downloadFile } from '../lib/services/downloadService';
 import { exportChecklistCsv } from '../lib/services/exportCsvService';
@@ -41,13 +42,20 @@ export function Workspace() {
   const [previewFile, setPreviewFile] = useState<UploadedDocument | null>(null);
   const [isGenerationModalOpen, setIsGenerationModalOpen] = useState(false);
 
+  // Replacement Confirmation State
+  const [replaceTarget, setReplaceTarget] = useState<{
+    requirement: Requirement;
+    currentFile: UploadedDocument;
+    newFileId: string;
+  } | null>(null);
+
   // Generation Progress State
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState<'cover' | 'merging' | 'footers' | 'finalizing'>('cover');
   const [generationProgressPct, setGenerationProgressPct] = useState(0);
   const [generationResult, setGenerationResult] = useState<GeneratePackageResult | null>(null);
 
-  // Auto-match State
+  // Auto-match Banner Dismiss State
   const [dismissedAutoMatch, setDismissedAutoMatch] = useState(false);
 
   // Toasts
@@ -83,11 +91,11 @@ export function Workspace() {
     return calculateValidationSummary(requirements, assignments, tender.submission_deadline);
   }, [tender, requirements, assignments]);
 
-  // Compute Auto-Match suggestions
-  const autoMatchSuggestions = useMemo(() => {
-    if (dismissedAutoMatch || !tender) return [];
-    return getAutoMatchSuggestions(requirements, files, assignments);
-  }, [requirements, files, assignments, dismissedAutoMatch, tender]);
+  // Candidate Match Analysis across requirements & unassigned documents
+  const candidateMatches = useMemo(() => {
+    if (!tender || files.length === 0) return {};
+    return analyzeAllCandidates(requirements, files, assignments);
+  }, [tender, requirements, files, assignments]);
 
   // Handler: Tender Loaded from JSON
   const handleTenderLoaded = (loadedTender: Tender, loadedReqs: Requirement[]) => {
@@ -177,8 +185,8 @@ export function Workspace() {
     });
   };
 
-  // Handler: Assign Document to Requirement
-  const handleAssignDocument = (requirementId: string, fileId: string) => {
+  // Core Assign logic
+  const executeAssignment = (requirementId: string, fileId: string) => {
     setAssignments(prev => {
       const updated = { ...prev };
 
@@ -202,6 +210,26 @@ export function Workspace() {
 
       return updated;
     });
+  };
+
+  // Handler: Assign Document with replacement check
+  const handleRequestAssignment = (requirement: Requirement, fileId: string) => {
+    const existingAssign = assignments[requirement.id];
+    const currentFileId = existingAssign?.fileId;
+
+    if (currentFileId && currentFileId !== fileId) {
+      const currentDoc = files.find(f => f.id === currentFileId);
+      if (currentDoc) {
+        setReplaceTarget({
+          requirement,
+          currentFile: currentDoc,
+          newFileId: fileId,
+        });
+        return;
+      }
+    }
+
+    executeAssignment(requirement.id, fileId);
   };
 
   // Handler: Remove Assignment
@@ -230,21 +258,29 @@ export function Workspace() {
     });
   };
 
-  // Handler: Apply Auto-Match Suggestions
-  const handleApplyAutoMatch = () => {
+  // Handler: Apply All Unambiguous High Matches
+  const handleApplyAllStrongMatches = () => {
     setAssignments(prev => {
       const updated = { ...prev };
-      for (const item of autoMatchSuggestions) {
-        updated[item.requirementId] = {
-          requirementId: item.requirementId,
-          fileId: item.fileId,
-          expiryDate: updated[item.requirementId]?.expiryDate || null,
-        };
+      let appliedCount = 0;
+
+      for (const [reqId, cands] of Object.entries(candidateMatches)) {
+        if (cands.length > 0 && cands[0].level === 'HIGH' && !updated[reqId]?.fileId) {
+          updated[reqId] = {
+            requirementId: reqId,
+            fileId: cands[0].fileId,
+            expiryDate: updated[reqId]?.expiryDate || null,
+          };
+          appliedCount++;
+        }
+      }
+
+      if (appliedCount > 0) {
+        addToast('success', t('requirements.applyAutoMatch'));
       }
       return updated;
     });
     setDismissedAutoMatch(true);
-    addToast('success', t('requirements.applyAutoMatch'));
   };
 
   // Handler: Generate Final Package
@@ -330,6 +366,8 @@ export function Workspace() {
     }
   };
 
+  const newDocForReplace = replaceTarget ? files.find(f => f.id === replaceTarget.newFileId) : null;
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50/70 text-slate-900 selection:bg-indigo-100 selection:text-indigo-900">
       {/* App Header */}
@@ -357,14 +395,19 @@ export function Workspace() {
                   requirements={requirements}
                   assignments={assignments}
                   files={files}
+                  candidateMatches={candidateMatches}
                   submissionDeadline={tender.submission_deadline}
-                  autoMatchSuggestions={autoMatchSuggestions}
-                  onApplyAutoMatch={handleApplyAutoMatch}
+                  hasUnconfirmedHighMatches={!dismissedAutoMatch}
+                  onApplyAllStrongMatches={handleApplyAllStrongMatches}
                   onDismissAutoMatch={() => setDismissedAutoMatch(true)}
                   onOpenSelector={(req) => setSelectorRequirement(req)}
                   onRemoveAssignment={handleRemoveAssignment}
                   onUpdateExpiryDate={handleUpdateExpiryDate}
                   onPreviewFile={(file) => setPreviewFile(file)}
+                  onAcceptCandidate={(reqId, fileId) => {
+                    const req = requirements.find(r => r.id === reqId);
+                    if (req) handleRequestAssignment(req, fileId);
+                  }}
                   getStatus={(req) => calculateRequirementStatus(req, assignments[req.id], tender.submission_deadline)}
                 />
               </div>
@@ -402,12 +445,32 @@ export function Workspace() {
         files={files}
         assignments={assignments}
         requirements={requirements}
+        candidateMatchesForReq={selectorRequirement ? candidateMatches[selectorRequirement.id] : []}
         onSelect={(fileId) => {
           if (selectorRequirement) {
-            handleAssignDocument(selectorRequirement.id, fileId);
+            handleRequestAssignment(selectorRequirement, fileId);
           }
         }}
         onClose={() => setSelectorRequirement(null)}
+      />
+
+      {/* Confirm Replacement Modal */}
+      <ConfirmReplaceModal
+        isOpen={Boolean(replaceTarget)}
+        requirementTitle={
+          replaceTarget
+            ? (language === 'bn' ? replaceTarget.requirement.title_bn : replaceTarget.requirement.title_en)
+            : ''
+        }
+        currentFileName={replaceTarget?.currentFile.name || ''}
+        newFileName={newDocForReplace?.name || ''}
+        onConfirm={() => {
+          if (replaceTarget) {
+            executeAssignment(replaceTarget.requirement.id, replaceTarget.newFileId);
+            setReplaceTarget(null);
+          }
+        }}
+        onCancel={() => setReplaceTarget(null)}
       />
 
       {/* PDF Canvas Preview Modal */}

@@ -1,14 +1,28 @@
 'use client';
 
 import React from 'react';
-import { Requirement, Assignment, UploadedDocument, DocumentStatus } from '../lib/types';
+import { Requirement, Assignment, UploadedDocument, DocumentStatus, CandidateMatch } from '../lib/types';
 import { useTranslation } from '../lib/i18n';
-import { CheckCircle2, AlertTriangle, XCircle, MinusCircle, FileText, Calendar, Eye } from 'lucide-react';
+import {
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  MinusCircle,
+  FileText,
+  Calendar,
+  Eye,
+  FileScan,
+  Sparkles,
+  HelpCircle,
+  ArrowRight
+} from 'lucide-react';
 
 interface RequirementRowProps {
   requirement: Requirement;
   assignment?: Assignment;
   assignedFile?: UploadedDocument;
+  candidates?: CandidateMatch[];
+  allFiles: UploadedDocument[];
   status: DocumentStatus;
   submissionDeadline: string;
   onSelectDocument: () => void;
@@ -16,23 +30,28 @@ interface RequirementRowProps {
   onRemoveDocument: () => void;
   onUpdateExpiryDate: (date: string) => void;
   onPreviewFile: (file: UploadedDocument) => void;
+  onAcceptCandidate: (fileId: string) => void;
 }
 
 export function RequirementRow({
   requirement,
   assignment,
   assignedFile,
+  candidates = [],
+  allFiles,
   status,
   onSelectDocument,
   onChangeDocument,
   onRemoveDocument,
   onUpdateExpiryDate,
   onPreviewFile,
+  onAcceptCandidate,
 }: RequirementRowProps) {
   const { language, t } = useTranslation();
 
   const title = language === 'bn' ? requirement.title_bn : requirement.title_en;
   const orderNumber = requirement.order.toString().padStart(2, '0');
+  const fileMap = new Map(allFiles.map(f => [f.id, f]));
 
   // Status visual badge styling & icon
   const getStatusBadge = () => {
@@ -74,6 +93,11 @@ export function RequirementRow({
         );
     }
   };
+
+  const topCandidate = candidates[0];
+  const topCandidateFile = topCandidate ? fileMap.get(topCandidate.fileId) : undefined;
+  const isAmbiguous = topCandidate?.level === 'AMBIGUOUS';
+  const isStrongMatch = topCandidate?.level === 'HIGH';
 
   return (
     <div
@@ -119,58 +143,61 @@ export function RequirementRow({
         </div>
       </div>
 
-      {/* Main Content: Matched file details or select button */}
-      <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      {/* Main Content: Matched file details OR Candidate Match Suggestion OR Select Button */}
+      <div className="mt-3.5 pt-3 border-t border-slate-100 flex flex-col gap-3">
         {assignedFile ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200/80">
-              <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
-              <span className="text-sm font-medium text-slate-800 max-w-[200px] sm:max-w-xs truncate" title={assignedFile.name}>
-                {assignedFile.name}
-              </span>
-              <span className="text-xs text-slate-500 border-l border-slate-200 pl-2">
-                {t('requirements.pagesCount', { pages: assignedFile.pageCount })}
-              </span>
-              <button
-                type="button"
-                onClick={() => onPreviewFile(assignedFile)}
-                title={t('actions.preview')}
-                className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors ml-1"
-              >
-                <Eye className="w-3.5 h-3.5" />
-              </button>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200/80">
+                {assignedFile.isScanned ? (
+                  <FileScan className="w-4 h-4 text-amber-600 shrink-0" />
+                ) : (
+                  <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
+                )}
+                <span className="text-sm font-medium text-slate-800 max-w-[200px] sm:max-w-xs truncate" title={assignedFile.name}>
+                  {assignedFile.name}
+                </span>
+                <span className="text-xs text-slate-500 border-l border-slate-200 pl-2">
+                  {t('requirements.pagesCount', { pages: assignedFile.pageCount })}
+                </span>
+                {assignedFile.detectedYears.length > 0 && (
+                  <span className="text-2xs font-mono font-semibold bg-slate-200/70 text-slate-700 px-1 py-0.2 rounded">
+                    {assignedFile.detectedYears.join(', ')}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onPreviewFile(assignedFile)}
+                  title={t('actions.preview')}
+                  className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors ml-1"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Expiry Date Input (only shown when has_expiry is true AND document is matched) */}
+              {requirement.has_expiry && (
+                <div className="flex items-center gap-2 bg-amber-50/50 px-2.5 py-1 rounded-lg border border-amber-200">
+                  <label
+                    htmlFor={`expiry-${requirement.id}`}
+                    className="text-xs font-medium text-amber-900 shrink-0"
+                  >
+                    {t('requirements.expiryDateLabel')}:
+                  </label>
+                  <input
+                    id={`expiry-${requirement.id}`}
+                    type="date"
+                    value={assignment?.expiryDate || ''}
+                    onChange={(e) => onUpdateExpiryDate(e.target.value)}
+                    className="text-xs font-mono font-medium text-slate-800 bg-white border border-slate-300 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder={t('requirements.expiryPlaceholder')}
+                  />
+                </div>
+              )}
             </div>
 
-            {/* Expiry Date Input (only shown when has_expiry is true AND document is matched) */}
-            {requirement.has_expiry && (
-              <div className="flex items-center gap-2 bg-amber-50/50 px-2.5 py-1 rounded-lg border border-amber-200">
-                <label
-                  htmlFor={`expiry-${requirement.id}`}
-                  className="text-xs font-medium text-amber-900 shrink-0"
-                >
-                  {t('requirements.expiryDateLabel')}:
-                </label>
-                <input
-                  id={`expiry-${requirement.id}`}
-                  type="date"
-                  value={assignment?.expiryDate || ''}
-                  onChange={(e) => onUpdateExpiryDate(e.target.value)}
-                  className="text-xs font-mono font-medium text-slate-800 bg-white border border-slate-300 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder={t('requirements.expiryPlaceholder')}
-                />
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-xs text-slate-400 italic">
-            {t('requirements.noDocSelected')}
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 self-end md:self-center shrink-0">
-          {assignedFile ? (
-            <>
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 self-end md:self-center shrink-0">
               <button
                 type="button"
                 onClick={onChangeDocument}
@@ -185,18 +212,84 @@ export function RequirementRow({
               >
                 {t('requirements.removeDocBtn')}
               </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              onClick={onSelectDocument}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              {t('requirements.selectDocBtn')}
-            </button>
-          )}
-        </div>
+            </div>
+          </div>
+        ) : (
+          /* Unassigned State: Check for Candidate Matches & Ambiguity */
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {isAmbiguous ? (
+              <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-lg bg-amber-50/80 border border-amber-200 text-xs text-amber-950">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="font-semibold">
+                  {t('requirements.ambiguousMatch', { count: candidates.length })}
+                </span>
+                <span className="text-amber-800">
+                  ({candidates.slice(0, 2).map(c => fileMap.get(c.fileId)?.name).join(' · ')})
+                </span>
+              </div>
+            ) : isStrongMatch && topCandidateFile ? (
+              <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-indigo-50/80 border border-indigo-200/80 text-xs">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span className="font-semibold text-indigo-900">
+                  {t('requirements.strongMatch', { percent: topCandidate.score })}:
+                </span>
+                <span className="font-mono text-slate-800 font-medium truncate max-w-[180px]" title={topCandidateFile.name}>
+                  {topCandidateFile.name}
+                </span>
+                {topCandidate.detectedYear && (
+                  <span className="bg-indigo-100 text-indigo-800 px-1 py-0.2 rounded font-mono text-2xs font-semibold">
+                    {topCandidate.detectedYear}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-400 italic">
+                {t('requirements.noDocSelected')}
+              </div>
+            )}
+
+            {/* Selection Action Buttons */}
+            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+              {isAmbiguous ? (
+                <button
+                  type="button"
+                  onClick={onSelectDocument}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 transition-colors"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  {t('requirements.chooseDocument')}
+                </button>
+              ) : isStrongMatch && topCandidateFile ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onAcceptCandidate(topCandidate.fileId)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-colors"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                    {t('requirements.useDocument')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onSelectDocument}
+                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                  >
+                    {t('requirements.changeDocBtn')}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onSelectDocument}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  {t('requirements.selectDocBtn')}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

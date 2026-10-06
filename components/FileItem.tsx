@@ -3,7 +3,7 @@
 import React from 'react';
 import { UploadedDocument } from '../lib/types';
 import { useTranslation } from '../lib/i18n';
-import { FileText, Eye, Trash2, Copy, AlertCircle } from 'lucide-react';
+import { FileText, Eye, Trash2, Copy, AlertCircle, FileScan } from 'lucide-react';
 
 interface FileItemProps {
   file: UploadedDocument;
@@ -45,6 +45,8 @@ export function FileItem({
               ? 'bg-rose-100 text-rose-600'
               : file.duplicate
               ? 'bg-amber-100 text-amber-700'
+              : file.isScanned
+              ? 'bg-amber-50 text-amber-700 border border-amber-200/50'
               : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors'
           }`}
         >
@@ -52,6 +54,8 @@ export function FileItem({
             <AlertCircle className="w-4 h-4" />
           ) : file.duplicate ? (
             <Copy className="w-4 h-4" />
+          ) : file.isScanned ? (
+            <FileScan className="w-4 h-4" />
           ) : (
             <FileText className="w-4 h-4" />
           )}
@@ -68,6 +72,14 @@ export function FileItem({
                 <span>{t('requirements.pagesCount', { pages: file.pageCount })}</span>
                 <span>·</span>
                 <span>{formatFileSize(file.size)}</span>
+                {file.detectedYears.length > 0 && (
+                  <>
+                    <span>·</span>
+                    <span className="font-mono text-slate-600 font-semibold bg-slate-100 px-1 py-0.2 rounded text-2xs">
+                      {file.detectedYears.join(', ')}
+                    </span>
+                  </>
+                )}
               </>
             ) : (
               <span className="text-rose-600 font-medium">
@@ -76,8 +88,8 @@ export function FileItem({
             )}
           </div>
 
-          {/* Status Label */}
-          <div className="mt-1">
+          {/* Status & Analysis Badges */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
             {file.duplicate ? (
               <span className="inline-flex items-center gap-1 text-2xs font-semibold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
                 {file.duplicateOf
@@ -93,6 +105,22 @@ export function FileItem({
                 {t('documents.readyTag')}
               </span>
             ) : null}
+
+            {file.readable && (
+              file.isScanned ? (
+                <span
+                  title={t('documents.scannedNotice')}
+                  className="inline-flex items-center gap-0.5 text-2xs font-medium text-amber-800 bg-amber-50/70 border border-amber-200/60 px-1.5 py-0.5 rounded"
+                >
+                  <FileScan className="w-3 h-3 text-amber-600" />
+                  {t('documents.scannedTag')}
+                </span>
+              ) : (
+                <span className="inline-flex items-center text-2xs font-medium text-sky-800 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200/60">
+                  {t('documents.textPdfTag')}
+                </span>
+              )
+            )}
           </div>
         </div>
       </div>

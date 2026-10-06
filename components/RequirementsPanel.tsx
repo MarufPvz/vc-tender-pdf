@@ -1,24 +1,25 @@
 'use client';
 
 import React from 'react';
-import { Requirement, Assignment, UploadedDocument, DocumentStatus } from '../lib/types';
+import { Requirement, Assignment, UploadedDocument, DocumentStatus, CandidateMatch } from '../lib/types';
 import { RequirementRow } from './RequirementRow';
 import { useTranslation } from '../lib/i18n';
-import { MatchSuggestion } from '../lib/services/matchingService';
 import { Sparkles, CheckCheck, X } from 'lucide-react';
 
 interface RequirementsPanelProps {
   requirements: Requirement[];
   assignments: Record<string, Assignment>;
   files: UploadedDocument[];
+  candidateMatches: Record<string, CandidateMatch[]>;
   submissionDeadline: string;
-  autoMatchSuggestions: MatchSuggestion[];
-  onApplyAutoMatch: () => void;
+  hasUnconfirmedHighMatches: boolean;
+  onApplyAllStrongMatches: () => void;
   onDismissAutoMatch: () => void;
   onOpenSelector: (req: Requirement) => void;
   onRemoveAssignment: (reqId: string) => void;
   onUpdateExpiryDate: (reqId: string, date: string) => void;
   onPreviewFile: (file: UploadedDocument) => void;
+  onAcceptCandidate: (reqId: string, fileId: string) => void;
   getStatus: (req: Requirement) => DocumentStatus;
 }
 
@@ -26,18 +27,25 @@ export function RequirementsPanel({
   requirements,
   assignments,
   files,
+  candidateMatches,
   submissionDeadline,
-  autoMatchSuggestions,
-  onApplyAutoMatch,
+  hasUnconfirmedHighMatches,
+  onApplyAllStrongMatches,
   onDismissAutoMatch,
   onOpenSelector,
   onRemoveAssignment,
   onUpdateExpiryDate,
   onPreviewFile,
+  onAcceptCandidate,
   getStatus,
 }: RequirementsPanelProps) {
   const { t } = useTranslation();
   const fileMap = new Map<string, UploadedDocument>(files.map(f => [f.id, f]));
+
+  // Count strong unassigned matches
+  const strongMatchCount = Object.values(candidateMatches).filter(
+    list => list.length > 0 && list[0].level === 'HIGH'
+  ).length;
 
   return (
     <div className="space-y-4">
@@ -53,19 +61,19 @@ export function RequirementsPanel({
         </div>
       </div>
 
-      {/* Auto-match banner (Bonus feature) */}
-      {autoMatchSuggestions.length > 0 && (
+      {/* Auto-match banner for unambiguous high confidence suggestions */}
+      {hasUnconfirmedHighMatches && strongMatchCount > 0 && (
         <div className="flex items-center justify-between gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 animate-fadeIn">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
             <span>
-              {t('requirements.autoMatchNotice', { count: autoMatchSuggestions.length })}
+              {t('requirements.autoMatchNotice', { count: strongMatchCount })}
             </span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
-              onClick={onApplyAutoMatch}
+              onClick={onApplyAllStrongMatches}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-2xs transition-colors"
             >
               <CheckCheck className="w-3.5 h-3.5" />
@@ -89,6 +97,7 @@ export function RequirementsPanel({
           const assign = assignments[req.id];
           const assignedFile = assign?.fileId ? fileMap.get(assign.fileId) : undefined;
           const status = getStatus(req);
+          const candidates = candidateMatches[req.id] || [];
 
           return (
             <RequirementRow
@@ -96,6 +105,8 @@ export function RequirementsPanel({
               requirement={req}
               assignment={assign}
               assignedFile={assignedFile}
+              candidates={candidates}
+              allFiles={files}
               status={status}
               submissionDeadline={submissionDeadline}
               onSelectDocument={() => onOpenSelector(req)}
@@ -103,6 +114,7 @@ export function RequirementsPanel({
               onRemoveDocument={() => onRemoveAssignment(req.id)}
               onUpdateExpiryDate={(date) => onUpdateExpiryDate(req.id, date)}
               onPreviewFile={onPreviewFile}
+              onAcceptCandidate={(fileId) => onAcceptCandidate(req.id, fileId)}
             />
           );
         })}

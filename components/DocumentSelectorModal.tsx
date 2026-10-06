@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Requirement, UploadedDocument, Assignment } from '../lib/types';
+import { Requirement, UploadedDocument, Assignment, CandidateMatch } from '../lib/types';
 import { useTranslation } from '../lib/i18n';
-import { Search, X, FileText, Check, AlertCircle, Copy } from 'lucide-react';
+import { Search, X, FileText, Check, AlertCircle, Copy, FileScan, Sparkles } from 'lucide-react';
 import { isContentHashAlreadyAssigned } from '../lib/services/duplicateService';
 
 interface DocumentSelectorModalProps {
@@ -12,6 +12,7 @@ interface DocumentSelectorModalProps {
   files: UploadedDocument[];
   assignments: Record<string, Assignment>;
   requirements: Requirement[];
+  candidateMatchesForReq?: CandidateMatch[];
   onSelect: (fileId: string) => void;
   onClose: () => void;
 }
@@ -22,6 +23,7 @@ export function DocumentSelectorModal({
   files,
   assignments,
   requirements,
+  candidateMatchesForReq = [],
   onSelect,
   onClose,
 }: DocumentSelectorModalProps) {
@@ -41,10 +43,17 @@ export function DocumentSelectorModal({
     }
   }
 
-  // Filter files by search
-  const filtered = files.filter(f =>
-    f.name.toLowerCase().includes(search.toLowerCase().trim())
-  );
+  // Map fileId to candidate match info
+  const candidateByFileId = new Map(candidateMatchesForReq.map(c => [c.fileId, c]));
+
+  // Filter and sort files (candidates first)
+  const filtered = files
+    .filter(f => f.name.toLowerCase().includes(search.toLowerCase().trim()))
+    .sort((a, b) => {
+      const scoreA = candidateByFileId.get(a.id)?.score || 0;
+      const scoreB = candidateByFileId.get(b.id)?.score || 0;
+      return scoreB - scoreA;
+    });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fadeIn">
@@ -113,8 +122,10 @@ export function DocumentSelectorModal({
 
               // 4. Is the file unreadable?
               const isUnreadable = !file.readable;
+              const isDisabled = isUnreadable || Boolean(isAssignedToOther) || duplicateConflict.isConflict;
 
-              const isDisabled = isUnreadable || isAssignedToOther || duplicateConflict.isConflict;
+              // Candidate match information
+              const match = candidateByFileId.get(file.id);
 
               return (
                 <div
@@ -125,19 +136,23 @@ export function DocumentSelectorModal({
                       onClose();
                     }
                   }}
-                  className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                  className={`p-3 rounded-xl border transition-all flex items-start justify-between gap-3 ${
                     isDisabled
                       ? 'opacity-60 bg-slate-50 border-slate-200 cursor-not-allowed'
                       : isCurrentlySelected
-                      ? 'bg-indigo-50/60 border-indigo-300 cursor-pointer shadow-xs'
-                      : 'bg-white border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30 cursor-pointer'
+                      ? 'bg-indigo-50/70 border-indigo-300 cursor-pointer shadow-xs'
+                      : match && match.score >= 70
+                      ? 'bg-indigo-50/20 border-indigo-200 hover:border-indigo-300 hover:bg-indigo-50/40 cursor-pointer'
+                      : 'bg-white border-slate-200 hover:border-indigo-300 hover:bg-slate-50 cursor-pointer'
                   }`}
                 >
-                  <div className="flex items-start gap-2.5 min-w-0">
+                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
                     <div
                       className={`p-2 rounded-lg shrink-0 mt-0.5 ${
                         isUnreadable
                           ? 'bg-rose-100 text-rose-600'
+                          : file.isScanned
+                          ? 'bg-amber-100 text-amber-700'
                           : isCurrentlySelected
                           ? 'bg-indigo-600 text-white'
                           : 'bg-slate-100 text-slate-600'
@@ -145,17 +160,62 @@ export function DocumentSelectorModal({
                     >
                       {isUnreadable ? (
                         <AlertCircle className="w-4 h-4" />
+                      ) : file.isScanned ? (
+                        <FileScan className="w-4 h-4" />
                       ) : (
                         <FileText className="w-4 h-4" />
                       )}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900 truncate" title={file.name}>
-                        {file.name}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {t('requirements.pagesCount', { pages: file.pageCount })}
-                      </p>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-slate-900 truncate" title={file.name}>
+                          {file.name}
+                        </p>
+                        {match && match.score >= 50 && (
+                          <span
+                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-2xs font-bold ${
+                              match.level === 'HIGH'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : match.level === 'AMBIGUOUS'
+                                ? 'bg-amber-100 text-amber-900'
+                                : 'bg-indigo-100 text-indigo-800'
+                            }`}
+                          >
+                            <Sparkles className="w-2.5 h-2.5" />
+                            {match.score}%
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-xs text-slate-500">
+                        <span>{t('requirements.pagesCount', { pages: file.pageCount })}</span>
+                        <span>·</span>
+                        {file.isScanned ? (
+                          <span className="text-amber-800 font-medium">{t('documents.scannedTag')}</span>
+                        ) : (
+                          <span className="text-sky-700">{t('documents.textPdfTag')}</span>
+                        )}
+                        {file.detectedYears.length > 0 && (
+                          <>
+                            <span>·</span>
+                            <span className="font-mono font-semibold text-slate-700 bg-slate-100 px-1 py-0.2 rounded text-2xs">
+                              {file.detectedYears.join(', ')}
+                            </span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Evidence snippets if candidate match exists */}
+                      {match && match.evidence.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {match.evidence.slice(0, 2).map((ev, i) => (
+                            <span key={i} className="text-3xs bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded">
+                              {ev}
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
                       {/* Explanation for why disabled */}
                       {isAssignedToOther && (
@@ -186,13 +246,13 @@ export function DocumentSelectorModal({
                   </div>
 
                   {/* Right side check or action */}
-                  <div className="shrink-0">
+                  <div className="shrink-0 mt-1">
                     {isCurrentlySelected ? (
                       <span className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center">
                         <Check className="w-3.5 h-3.5" />
                       </span>
                     ) : !isDisabled ? (
-                      <span className="text-xs font-semibold text-indigo-600">
+                      <span className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
                         {t('dialogs.select')}
                       </span>
                     ) : null}

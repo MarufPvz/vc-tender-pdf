@@ -19,6 +19,12 @@ interface StoredProject {
     duplicate: boolean;
     duplicateOf?: string;
     readable: boolean;
+    hasTextLayer?: boolean;
+    isScanned?: boolean;
+    extractedText?: string;
+    normalizedText?: string;
+    detectedYears?: string[];
+    analysisStatus?: 'pending' | 'analyzing' | 'ready' | 'error';
     arrayBuffer: ArrayBuffer;
   }>;
 }
@@ -61,6 +67,12 @@ export async function saveProjectToStorage(
         duplicate: f.duplicate,
         duplicateOf: f.duplicateOf,
         readable: f.readable,
+        hasTextLayer: f.hasTextLayer,
+        isScanned: f.isScanned,
+        extractedText: f.extractedText,
+        normalizedText: f.normalizedText,
+        detectedYears: f.detectedYears,
+        analysisStatus: f.analysisStatus,
         arrayBuffer: buffer,
       };
     })
@@ -111,6 +123,12 @@ export async function loadProjectFromStorage(): Promise<{
             duplicate: f.duplicate,
             duplicateOf: f.duplicateOf,
             readable: f.readable,
+            hasTextLayer: f.hasTextLayer ?? true,
+            isScanned: f.isScanned ?? false,
+            extractedText: f.extractedText ?? '',
+            normalizedText: f.normalizedText ?? '',
+            detectedYears: f.detectedYears ?? [],
+            analysisStatus: f.analysisStatus ?? 'ready',
             file: fileObj,
             arrayBuffer: f.arrayBuffer,
           };

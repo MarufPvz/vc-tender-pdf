@@ -7,6 +7,8 @@ export type DocumentStatus =
   | 'EXPIRED'
   | 'NOT_PROVIDED';
 
+export type MatchConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'AMBIGUOUS' | 'NONE';
+
 export interface Tender {
   tender_id: string;
   title: string;
@@ -22,6 +24,7 @@ export interface Requirement {
   title_bn: string;
   mandatory: boolean;
   has_expiry: boolean;
+  aliases?: string[];
 }
 
 export interface UploadedDocument {
@@ -31,9 +34,15 @@ export interface UploadedDocument {
   size: number;
   pageCount: number;
   hash: string;
+  readable: boolean;
+  hasTextLayer: boolean;
+  isScanned: boolean;
+  extractedText: string;
+  normalizedText: string;
+  detectedYears: string[];
   duplicate: boolean;
   duplicateOf?: string; // name or id of primary file with same hash
-  readable: boolean;
+  analysisStatus: 'pending' | 'analyzing' | 'ready' | 'error';
   errorReason?: string;
   arrayBuffer?: ArrayBuffer;
 }
@@ -42,6 +51,16 @@ export interface Assignment {
   requirementId: string;
   fileId: string | null;
   expiryDate: string | null; // YYYY-MM-DD
+}
+
+export interface CandidateMatch {
+  requirementId: string;
+  fileId: string;
+  score: number;
+  margin: number;
+  level: MatchConfidenceLevel;
+  evidence: string[];
+  detectedYear?: string;
 }
 
 export interface ValidationSummary {
