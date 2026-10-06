@@ -70,6 +70,46 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
     let text = current;
     if (params) {
+      // 1. Process ICU plural format first: {key, plural, one {...} other {...}}
+      text = text.replace(
+        /\{([a-zA-Z0-9_]+),\s*plural,\s*([^{}]+(?:\{[^{}]*\}[^{}]*)*)\}/g,
+        (match, key, choicesStr) => {
+          if (!(key in params)) {
+            return match;
+          }
+          const rawVal = params[key];
+          const num = Number(rawVal);
+          if (isNaN(num)) {
+            return match;
+          }
+
+          const choices: Record<string, string> = {};
+          const choiceRegex = /([=\w]+)\s*\{([^{}]*)\}/g;
+          let choiceMatch: RegExpExecArray | null;
+          while ((choiceMatch = choiceRegex.exec(choicesStr)) !== null) {
+            choices[choiceMatch[1]] = choiceMatch[2];
+          }
+
+          let selectedText: string | undefined;
+          if (`=${num}` in choices) {
+            selectedText = choices[`=${num}`];
+          } else if (num === 0 && 'zero' in choices) {
+            selectedText = choices['zero'];
+          } else if (num === 1 && 'one' in choices) {
+            selectedText = choices['one'];
+          } else if (num === 2 && 'two' in choices) {
+            selectedText = choices['two'];
+          } else if ('other' in choices) {
+            selectedText = choices['other'];
+          } else {
+            selectedText = Object.values(choices)[0] ?? '';
+          }
+
+          return selectedText.replace(/#/g, String(rawVal));
+        }
+      );
+
+      // 2. Process variable substitutions: {k}
       Object.entries(params).forEach(([k, v]) => {
         text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
       });

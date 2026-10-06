@@ -326,7 +326,7 @@ export function AutoMatchReviewModal({
                                   {optFile.name}
                                 </span>
                                 <span className="text-2xs text-slate-500">
-                                  ({optFile.pageCount} {optFile.pageCount === 1 ? 'page' : 'pages'})
+                                  ({t('requirements.pagesCount', { pages: optFile.pageCount })})
                                 </span>
                                 {optFile.detectedYears.length > 0 && (
                                   <span className="font-mono text-3xs font-semibold bg-slate-100 px-1 py-0.2 rounded">
